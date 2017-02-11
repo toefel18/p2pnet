@@ -1,0 +1,13 @@
+{
+	"comment": "",
+	"ignore": "test",
+	"package": [
+		{
+			"checksumSHA1": "p9Q65e9u/qTWe+7cMgDV5W2WgF8=",
+			"path": "github.com/jbenet/go-reuseport",
+			"revision": "dda7388ef3b7f2c95e80fbc8d0206cc5acb8b90b",
+			"revisionTime": "2016-11-01T23:13:37Z"
+		}
+	],
+	"rootPath": "github.com/toefel18/p2pnet"
+}
