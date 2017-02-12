@@ -56,6 +56,7 @@ func NewDefaultDiscovey(localName string) *Discovery {
 		heartbeatInterval:    3 * time.Second,
 		peersByName:          make(Peers),
 		closeHeartbeatSender: make(chan struct{}),
+		closeOutdatedPrune:   make(chan struct{}),
 		heartbeater: &heartbeater{
 			address:    "255.255.255.255",
 			port:       DiscoveryPort,
@@ -80,9 +81,13 @@ func (d *Discovery) Start() {
 }
 
 func (d *Discovery) Stop() {
-	d.closeHeartbeatSender <- struct{}{}
+	fmt.Println("stopping pruner")
 	d.closeOutdatedPrune <- struct{}{}
+	fmt.Println("stopping heartbeat")
+	d.closeHeartbeatSender <- struct{}{}
+	fmt.Println("stopping heartbeat listener")
 	d.heartbeatListener.Close()
+	fmt.Println("discovery shutdown complete")
 }
 
 func (d *Discovery) removePeer(name string) {
@@ -143,9 +148,11 @@ func (d *Discovery) receiveHeartbeats() {
 func (d *Discovery) pruneOutdatedPeers() {
 	for {
 		select {
-		case <-d.closeHeartbeatSender:
+		case <-d.closeOutdatedPrune:
+			fmt.Println("closing prune")
 			return
 		case <-time.Tick(pruneInterval):
+			fmt.Println("tick prune")
 			d.doPruneOutdatedPeers()
 		}
 	}

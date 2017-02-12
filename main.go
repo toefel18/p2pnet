@@ -6,22 +6,16 @@ import (
 	"log"
 	"math/rand"
 	"os"
-	"os/exec"
+	"os/signal"
 	"strconv"
-	"text/tabwriter"
-	"text/template"
-	"time"
 
+	"github.com/toefel18/p2pnet/discovery/network"
+	"github.com/toefel18/p2pnet/discovery/report"
 	"github.com/toefel18/p2pnet/discovery/udp"
 )
 
 // TODO WARNING, vendored code has been changed to also set SO_BROADCAST (required for sending to broadcast address)
 // TODO files changed in vendor: const_bsd.go const_linux.go impl_unix.go
-
-const discoverySummaryFormat = `Discovery Summary - nodes in network
-NAME	ADDRESS	ALIVE SINCE	KNOWN SINCE	LAST SEEN	TIMES SEEN	STATUS
-{{ range $key, $p := . }}{{$p.PeerName}}	{{$p.NetProtocol}}://{{$p.NetAddress}}:{{$p.NetPort}}	{{$p.AliveSince}}	{{$p.KnownSince}}	{{$p.LastSeen}}	{{$p.TimesSeen}}	{{$p.Status}}
-{{ end }}`
 
 var nodeName string
 
@@ -42,29 +36,19 @@ func main() {
 	discovery := udp.NewDefaultDiscovey(nodeName)
 	discovery.Start()
 	fmt.Println("Waiting for hearbeats...")
-	reportDiscoveryContinuously(discovery)
+	stopSignal := make(chan struct{})
+	go report.PrintDiscoverySummaryContinuously(nodeName, discovery, stopSignal)
+	waitForSigInterrupt(discovery, stopSignal)
 }
 
-func reportDiscoveryContinuously(discovery *udp.Discovery) {
-	summaryTemplate, err := template.New("DiscoverySummary").Parse(discoverySummaryFormat)
-	if err != nil {
-		panic(err)
-	}
-	w := tabwriter.NewWriter(os.Stdout, 4, 4, 4, ' ', 0)
-	for {
-		time.Sleep(2 * time.Second)
-		if len(discovery.Peers()) == 0 {
-			continue
-		}
-		clearStdOut()
-		fmt.Println(nodeName, ": Heartbeats sent:", discovery.HeartbeatsSent)
-		summaryTemplate.Execute(w, discovery.Peers())
-		w.Flush()
-	}
-}
-
-func clearStdOut() {
-	cmd := exec.Command("clear")
-	cmd.Stdout = os.Stdout
-	cmd.Run()
+func waitForSigInterrupt(discovery network.Discovery, stopSignal chan struct{}) {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	fmt.Println("Ctrl+c to stop")
+	signal := <-c
+	fmt.Println("got signal", signal.String(), "shutting down ...")
+	discovery.Stop()
+	fmt.Println("stopping reporting")
+	stopSignal <- struct{}{}
+	fmt.Println("bye")
 }
